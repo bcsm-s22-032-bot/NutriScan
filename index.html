@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}NutriScan{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- LEFT COLUMN: upload + summary -->
+  <div class="col-12 col-lg-4">
+    <div class="glass-card p-4 h-100 d-flex flex-column">
+
+      <div class="mb-3">
+        <div class="section-title mb-1">Upload</div>
+        <h2 class="h4 mb-0 text-white">Analyze Your Meal</h2>
+        <p class="text-secondary mb-0" style="font-size: 0.9rem;">
+          Upload a photo of fast food (pizza, burger/sandwich, hot dog, donut, cake, fruits, etc.)
+          to estimate approximate calories.
+        </p>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data" class="mt-2">
+        <div class="mb-3">
+          <label for="image" class="form-label">Select image</label>
+          <input
+            class="form-control form-control-sm"
+            type="file"
+            id="image"
+            name="image"
+            accept="image/*"
+            capture="environment"
+            required
+          >
+          <div class="form-text text-secondary">
+            On mobile, camera will open automatically.
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          🔍 Analyze Image
+        </button>
+      </form>
+
+      <hr class="border-secondary-subtle my-4">
+
+      <div class="section-title mb-2">Summary</div>
+
+      {% if results and results.per_item %}
+        {% set item_count = results.per_item|length %}
+        <div class="row g-3 mb-2">
+          <div class="col-6">
+            <div class="glass-card-light p-3 text-center">
+              <div class="metric-label mb-1">Total Calories</div>
+              <div class="metric-value text-warning">
+                {{ results.total_cal|round(1) }} kcal
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="glass-card-light p-3 text-center">
+              <div class="metric-label mb-1">Items Detected</div>
+              <div class="metric-value text-info">
+                {{ item_count }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <div class="section-title mb-2" style="font-size: 0.85rem;">Per Item Breakdown</div>
+
+          <div class="table-responsive">
+            <table class="table table-dark table-striped table-hover table-dark-custom align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Food</th>
+                  <th>Portion</th>
+                  <th>Calories</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in results.per_item %}
+                  <tr>
+                    <td>
+                      <span class="badge badge-food me-1">{{ item.label }}</span>
+                    </td>
+                    <td>
+                      <span class="badge bg-secondary">{{ item.size }}</span>
+                    </td>
+                    <td>
+                      <span class="text-warning">{{ item.calories|round(1) }} kcal</span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      {% elif results %}
+        <p class="text-secondary mt-2 mb-0">
+          No supported fast-food items detected in this image.
+        </p>
+      {% else %}
+        <p class="text-secondary mt-2 mb-0">
+          No analysis yet. Upload an image to see results.
+        </p>
+      {% endif %}
+
+      <div class="mt-auto pt-3 small text-secondary">
+        <strong>Note:</strong> This is a research prototype using pre-trained deep learning models.
+        Calorie estimates are rough and not suitable for medical or dietary decisions.
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: visualizations -->
+  <div class="col-12 col-lg-8">
+    <div class="glass-card p-4 h-100">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+          <div class="section-title mb-1">Visualizations</div>
+          <h2 class="h5 text-white mb-0">Detection & Segmentation</h2>
+        </div>
+        {% if results and results.yolo_dets %}
+          <span class="badge bg-primary">
+            {{ results.yolo_dets|length }} detections
+          </span>
+        {% endif %}
+      </div>
+
+      {% if results %}
+        <div class="row g-3 mt-1">
+          <div class="col-12 col-md-6">
+            <div class="mb-1 small text-secondary">YOLO – Object Detection</div>
+            {% if results.boxed_b64 %}
+              <img
+                class="result-image"
+                src="data:image/png;base64,{{ results.boxed_b64 }}"
+                alt="YOLO detections"
+              >
+            {% else %}
+              <div class="glass-card-light p-3 text-center text-secondary">
+                No detections to visualize.
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <div class="mb-1 small text-secondary">Mask R-CNN – Instance Segmentation</div>
+            {% if results.seg_b64 %}
+              <img
+                class="result-image"
+                src="data:image/png;base64,{{ results.seg_b64 }}"
+                alt="Mask R-CNN segmentations"
+              >
+            {% else %}
+              <div class="glass-card-light p-3 text-center text-secondary">
+                No segmentations to visualize.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if results.per_item %}
+          <hr class="border-secondary-subtle my-3">
+          <div class="section-title mb-2" style="font-size: 0.85rem;">Model Details</div>
+
+          <div class="table-responsive">
+            <table class="table table-dark table-striped table-hover table-dark-custom align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Food (YOLO)</th>
+                  <th>YOLO Conf.</th>
+                  <th>CNN Top-1 Label</th>
+                  <th>CNN Prob.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for det in results.yolo_dets %}
+                  <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><span class="badge badge-food">{{ det.label }}</span></td>
+                    <td>{{ (det.score * 100) | round(1) }}%</td>
+                    <td>{{ det.cnn_label }}</td>
+                    <td>{{ (det.cnn_conf * 100) | round(1) }}%</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+      {% else %}
+        <div class="glass-card-light p-4 text-center text-secondary mt-3">
+          Upload an image on the left to see detection and segmentation results here.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
