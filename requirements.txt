@@ -1,0 +1,6 @@
+flask
+gunicorn
+ultralytics
+pillow
+torch
+torchvision
